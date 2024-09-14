@@ -8,7 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y git
 
 # Copy the package.json and package-lock.json to install dependencies first
-COPY package*.json /app
+COPY package*.json /app/
 
 # Manually update critical libraries
 RUN npm install
