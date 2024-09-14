@@ -1,0 +1,100 @@
+version: "3.8"
+
+services:
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v2.9
+    command:
+      - "--api.insecure=true"  # Enable Traefik Dashboard
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"  # HTTP
+      - "--entrypoints.websecure.address=:443"  # HTTPS
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=your-email@example.com"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"  # HTTP
+      - "443:443"  # HTTPS
+      - "8080:8080"  # Traefik Dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - web
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "3000:5143"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`your-domain.com`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    networks:
+      - web
+    depends_on:
+      - backend
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`your-domain.com`) && PathPrefix(`/api`)"
+      - "traefik.http.middlewares.backend-strip.stripprefix.prefixes=/api"
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+    networks:
+      - web
+    depends_on:
+      - postgres
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: 12345
+      POSTGRES_DB: yourdb
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - web
+
+  # Adminer (DB management tool)
+  adminer:
+    image: adminer
+    restart: always
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer.rule=Host(`db.your-domain.com`)"
+      - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+    networks:
+      - web
+
+  # Nginx Proxy Manager
+  proxy-manager:
+    image: jc21/nginx-proxy-manager:latest
+    restart: always
+    ports:
+      - "8090:80"  # Access Proxy Manager at this port
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.proxy-manager.rule=Host(`proxy.your-domain.com`)"
+      - "traefik.http.services.proxy-manager.loadbalancer.server.port=8090"
+    networks:
+      - web
+
+volumes:
+  postgres_data: {}
+
+networks:
+  web:
+    driver: bridge
