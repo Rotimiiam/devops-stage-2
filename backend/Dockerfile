@@ -5,8 +5,7 @@ FROM python:3.10-slim
 ENV POETRY_VERSION=1.8.3 \
     POETRY_HOME="/opt/poetry" \
     POETRY_NO_INTERACTION=1 \
-    POETRY_VIRTUALENVS_CREATE=false \
-    PATH="$POETRY_HOME/bin:$PATH"
+    POETRY_VIRTUALENVS_CREATE=false
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -17,11 +16,14 @@ RUN apt-get update && apt-get install -y curl build-essential && rm -rf /var/lib
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
 
+# Ensure Poetry is available in the PATH
+ENV PATH="/opt/poetry/bin:$PATH"
+
 # Copy the pyproject.toml and poetry.lock files to install dependencies first
 COPY pyproject.toml poetry.lock* /app/
 
 # Install Python dependencies using Poetry (without creating virtualenv)
-RUN poetry install --no-root
+RUN /opt/poetry/bin/poetry install --no-root
 
 # Copy the rest of the backend code to the container
 COPY . /app
