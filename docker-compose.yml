@@ -41,6 +41,8 @@ services:
   backend:
     build:
       context: ./backend
+    ports:
+      - "8000:8000"
     deploy:
       resources:
         limits:
