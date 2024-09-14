@@ -41,6 +41,10 @@ services:
   backend:
     build:
       context: ./backend
+    deploy:
+      resources:
+        limits:
+          memory: 500M
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.backend.rule=Host(`your-domain.com`) && PathPrefix(`/api`)"
