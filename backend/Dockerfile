@@ -25,6 +25,7 @@ COPY pyproject.toml poetry.lock* /app/
 # Install Python dependencies using Poetry (without creating virtualenv)
 RUN /opt/poetry/bin/poetry install --no-root
 
+
 # Copy the rest of the backend code to the container
 COPY . /app
 

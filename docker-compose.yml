@@ -8,13 +8,12 @@ services:
       - "--api.insecure=true"  # Enable Traefik Dashboard
       - "--providers.docker=true"
       - "--entrypoints.web.address=:80"  # HTTP
-      - "--entrypoints.websecure.address=:443"  # HTTPS
       - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
       - "--certificatesresolvers.mytlschallenge.acme.email=your-email@example.com"
       - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"  # HTTP
-      - "443:443"  # HTTPS
+      - "443:443"  # HTTPS (if you want to use HTTPS, you need to configure SSL certificates as well)
       - "8080:8080"  # Traefik Dashboard
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -30,8 +29,8 @@ services:
       - "3000:5143"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`your-domain.com`)"
-      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.http.routers.frontend.rule=Host(`localhost`) && PathPrefix(`/`)"
+      - "traefik.http.services.frontend.loadbalancer.server.port=5143"  # Match this port with your frontend's internal port
     networks:
       - web
     depends_on:
@@ -43,27 +42,30 @@ services:
       context: ./backend
     ports:
       - "8000:8000"
-    deploy:
-      resources:
-        limits:
-          memory: 500M
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`your-domain.com`) && PathPrefix(`/api`)"
-      - "traefik.http.middlewares.backend-strip.stripprefix.prefixes=/api"
+      - "traefik.http.routers.api.rule=Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.docs.rule=Host(`localhost`) && PathPrefix(`/docs`)"
+      - "traefik.http.middlewares.backend-strip-api.stripprefix.prefixes=/api"
+      - "traefik.http.middlewares.backend-strip-docs.stripprefix.prefixes=/docs"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
-    networks:
-      - web
+    env_file:
+      - ./backend/.env
     depends_on:
       - postgres
+    networks:
+      - web
+    environment:
+      PYTHONPATH: /app
+    command: bash -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   # PostgreSQL Database
   postgres:
     image: postgres:14
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: 12345
-      POSTGRES_DB: yourdb
+    ports:
+      - "5432:5432"
+    env_file:
+      - ./backend/.env  
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -73,28 +75,14 @@ services:
   adminer:
     image: adminer
     restart: always
+    ports:
+      - "8090:8080"
     environment:
       ADMINER_DEFAULT_SERVER: postgres
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.adminer.rule=Host(`db.your-domain.com`)"
+      - "traefik.http.routers.adminer.rule=Host(`localhost`) && PathPrefix(`/db`)"
       - "traefik.http.services.adminer.loadbalancer.server.port=8080"
-    networks:
-      - web
-
-  # Nginx Proxy Manager
-  proxy-manager:
-    image: jc21/nginx-proxy-manager:latest
-    restart: always
-    ports:
-      - "8090:80"  # Access Proxy Manager at this port
-    volumes:
-      - ./data:/data
-      - ./letsencrypt:/etc/letsencrypt
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.proxy-manager.rule=Host(`proxy.your-domain.com`)"
-      - "traefik.http.services.proxy-manager.loadbalancer.server.port=8090"
     networks:
       - web
 
