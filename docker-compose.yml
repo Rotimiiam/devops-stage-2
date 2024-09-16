@@ -80,9 +80,12 @@ services:
     environment:
       ADMINER_DEFAULT_SERVER: postgres
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.adminer.rule=Host(`localhost`) && PathPrefix(`/db`)"
-      - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+    - "traefik.enable=true"
+    - "traefik.http.routers.adminer.rule=Host(`db.localhost.com`)" # Point to your subdomain
+    - "traefik.http.routers.adminer.entrypoints=web"  # Use HTTP
+    - "traefik.http.routers.adminer.entrypoints=websecure"  # Use HTTPS if needed
+    - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+    - "traefik.http.routers.adminer.tls.certresolver=mytlschallenge"
     networks:
       - web
 
